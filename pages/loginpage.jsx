@@ -1,37 +1,74 @@
-import React, { useState } from "react"
-import { Mail, Lock, Eye, EyeOff, Sparkles, ArrowLeft } from "lucide-react"
+import React, { useState, useEffect } from "react"
+import { Mail, Lock, Eye, EyeOff, Sparkles, ArrowLeft, AlertCircle } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../src/contexts/AuthContext"
+import { useUserData } from "../src/hooks/useUserData"
 import Button from "../src/components/ui/button"
 import Card from "../src/components/ui/card"
 
 const LoginPage = () => {
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [error, setError] = useState("")
   const navigate = useNavigate()
+  const { login, currentUser, clearError } = useAuth()
+  const { questionResponses, loading } = useUserData()
   const [formData, setFormData] = useState({
     email: "",
     password: "",
   })
+
+  useEffect(() => {
+    if (currentUser && !loading) {
+      // Check if user has already answered questions
+      if (questionResponses && questionResponses.responses) {
+        console.log('✅ User has answered questions, redirecting to dashboard')
+        navigate("/dashboard")
+      } else {
+        // Check localStorage as backup
+        const savedAnswers = localStorage.getItem("soulcircle-answers")
+        if (savedAnswers) {
+          try {
+            const parsedAnswers = JSON.parse(savedAnswers)
+            if (Object.keys(parsedAnswers).length === 6) { // 6 questions total
+              console.log('✅ User has completed questions in localStorage, redirecting to dashboard')
+              navigate("/dashboard")
+              return
+            }
+          } catch (error) {
+            console.error('Error parsing saved answers:', error)
+          }
+        }
+        // If no previous answers, go to questions
+        navigate("/questions")
+      }
+    }
+  }, [currentUser, questionResponses, loading, navigate])
 
   const handleInputChange = (e) => {
     setFormData({
       ...formData,
       [e.target.name]: e.target.value,
     })
+    if (error) {
+      setError("")
+      clearError()
+    }
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     setIsLoading(true)
+    setError("")
 
-    // Simulate API call
-    await new Promise((resolve) => setTimeout(resolve, 2000))
-
-    console.log("Login attempt:", formData)
-
-    // Simulate successful login
-    setIsLoading(false)
-    navigate("/questions")
+    try {
+      await login(formData.email, formData.password)
+      // The useEffect will handle the redirect based on whether user has answered questions
+    } catch (error) {
+      setError(error.message)
+    } finally {
+      setIsLoading(false)
+    }
   }
 
   return (
@@ -79,6 +116,14 @@ const LoginPage = () => {
             <h1 className="text-3xl font-bold text-gray-800 mb-2">Welcome Back</h1>
             <p className="text-gray-600">Sign in to continue your healing journey</p>
           </div>
+
+          {/* Error Message */}
+          {error && (
+            <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center">
+              <AlertCircle className="w-5 h-5 mr-2" />
+              {error}
+            </div>
+          )}
 
           {/* Form */}
           <form onSubmit={handleSubmit} className="space-y-6">
@@ -158,7 +203,7 @@ const LoginPage = () => {
           <div className="text-center mt-6">
             <p className="text-gray-600">
               Don't have an account?
-              <button className="ml-2 text-purple-600 hover:text-purple-700 font-semibold">
+              <button onClick={() => navigate("/signup")} className="ml-2 text-purple-600 hover:text-purple-700 font-semibold">
                 Sign Up
               </button>
             </p>

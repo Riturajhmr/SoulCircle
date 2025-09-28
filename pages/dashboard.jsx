@@ -1,9 +1,114 @@
-import React from "react"
-import { Moon, Heart, MessageCircle, Users, PenTool, Star } from "lucide-react"
+import React, { useState, useEffect } from "react"
+import { Moon, Heart, MessageCircle, Users, PenTool, Star, TrendingUp, User, LogOut } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../src/contexts/AuthContext"
+import { useUserData } from "../src/hooks/useUserData"
+import Button from "../src/components/ui/button"
+import Card from "../src/components/ui/card"
 
 const DashboardPage = () => {
   const navigate = useNavigate()
+  const { currentUser, logout } = useAuth()
+  const { 
+    userProfile, 
+    userActivities,
+    trackActivity
+  } = useUserData()
+
+  const [showMoodCheck, setShowMoodCheck] = useState(false)
+  const [moodOptions] = useState([
+    { emoji: "🌙", label: "Calm", color: "from-blue-400 to-purple-400" },
+    { emoji: "💜", label: "Hopeful", color: "from-purple-400 to-pink-400" },
+    { emoji: "💧", label: "Sad", color: "from-blue-300 to-cyan-300" },
+    { emoji: "🔥", label: "Energetic", color: "from-orange-400 to-red-400" },
+    { emoji: "🌱", label: "Growing", color: "from-green-400 to-emerald-400" },
+    { emoji: "☁️", label: "Numb", color: "from-gray-300 to-slate-300" }
+  ])
+
+  // Check if user has answered mood question today
+  useEffect(() => {
+    const checkTodayMood = () => {
+      if (currentUser) {
+        const today = new Date().toDateString()
+        
+        // Check localStorage first (faster)
+        const lastMoodCheck = localStorage.getItem(`moodCheck_${currentUser.uid}`)
+        if (lastMoodCheck === today) {
+          console.log('✅ Mood already checked today (localStorage)')
+          return
+        }
+        
+        // Check Firebase activities
+        if (userActivities) {
+          const todayMood = userActivities.find(activity => 
+            activity.type === 'mood_check' && 
+            new Date(activity.metadata?.date || activity.timestamp?.seconds * 1000).toDateString() === today
+          )
+          if (todayMood) {
+            console.log('✅ Mood already checked today (Firebase)')
+            // Update localStorage
+            localStorage.setItem(`moodCheck_${currentUser.uid}`, today)
+            return
+          }
+        }
+        
+        // If no mood check found for today, show the modal
+        console.log('❌ No mood check found for today, showing modal')
+        setShowMoodCheck(true)
+      }
+    }
+    
+    // Add a small delay to ensure userActivities is loaded
+    const timer = setTimeout(checkTodayMood, 1000)
+    return () => clearTimeout(timer)
+  }, [currentUser, userActivities])
+
+  const handleMoodSubmit = async (mood) => {
+    try {
+      const selectedMood = moodOptions.find(m => m.label === mood)
+      const today = new Date().toDateString()
+      
+      await trackActivity({
+        type: 'mood_check',
+        description: `Mood check: ${mood}`,
+        metadata: {
+          mood: mood,
+          emoji: selectedMood?.emoji || '❓',
+          date: new Date().toISOString(),
+          timestamp: new Date().toISOString()
+        }
+      })
+      
+      // Update localStorage to prevent showing again today
+      localStorage.setItem(`moodCheck_${currentUser.uid}`, today)
+      
+      setShowMoodCheck(false)
+      await refreshData()
+      
+      console.log(`✅ Mood saved: ${mood} for ${today}`)
+      alert(`Thank you for sharing your mood! ${selectedMood?.emoji}`)
+    } catch (err) {
+      console.error('Error saving mood:', err)
+      alert(`Error saving mood: ${err.message}`)
+    }
+  }
+
+  const handleSkipMoodCheck = () => {
+    const today = new Date().toDateString()
+    localStorage.setItem(`moodCheck_${currentUser.uid}`, today)
+    setShowMoodCheck(false)
+    console.log('⏭️ Mood check skipped for today')
+  }
+
+  const handleLogout = async () => {
+    try {
+      await logout()
+      navigate('/')
+    } catch (err) {
+      alert(`Error logging out: ${err.message}`)
+    }
+  }
+
   return (
     <div
       className="min-h-screen relative overflow-hidden"
@@ -37,6 +142,29 @@ const DashboardPage = () => {
               <Moon className="w-6 h-6 text-purple-200" />
               <span className="text-white font-semibold text-lg">SoulCircle</span>
             </div>
+            
+                {/* User Profile & Actions */}
+                <div className="flex items-center space-x-4">
+                  {currentUser && (
+                    <>
+                      <Button
+                        onClick={() => navigate('/profile')}
+                        className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                      >
+                        <User className="w-4 h-4 mr-2" />
+                        {userProfile?.displayName || currentUser.email?.split('@')[0]}
+                      </Button>
+                      
+                      <Button
+                        onClick={handleLogout}
+                        className="bg-red-500/20 hover:bg-red-500/30 text-white border-red-300/30"
+                      >
+                        <LogOut className="w-4 h-4 mr-2" />
+                        Logout
+                      </Button>
+                    </>
+                  )}
+                </div>
           </div>
         </div>
       </nav>
@@ -56,6 +184,40 @@ const DashboardPage = () => {
               Your safe space for healing, connection, and growth. Choose how you'd like to begin your journey today.
             </p>
           </div>
+
+          {/* Daily Mood Check Modal */}
+          {showMoodCheck && (
+            <div className="fixed inset-0 bg-black/50 backdrop-blur-sm flex items-center justify-center z-50 p-4">
+              <Card className="p-8 bg-white/10 backdrop-blur-md border-white/20 rounded-3xl max-w-md w-full">
+                <div className="text-center space-y-6">
+                  <h2 className="text-2xl font-semibold text-white">
+                    How are you feeling today? 💫
+                  </h2>
+                  <p className="text-purple-200">Take a moment to check in with yourself</p>
+                  
+                  <div className="grid grid-cols-3 gap-4">
+                    {moodOptions.map((mood, index) => (
+                      <button
+                        key={index}
+                        onClick={() => handleMoodSubmit(mood.label)}
+                        className={`p-4 rounded-2xl bg-gradient-to-br ${mood.color} transition-all duration-300 hover:scale-105 hover:shadow-lg`}
+                      >
+                        <div className="text-3xl mb-2">{mood.emoji}</div>
+                        <div className="text-white text-sm font-medium">{mood.label}</div>
+                      </button>
+                    ))}
+                  </div>
+                  
+                  <Button 
+                    onClick={handleSkipMoodCheck}
+                    className="bg-white/20 hover:bg-white/30 text-white border-white/30"
+                  >
+                    Skip for now
+                  </Button>
+                </div>
+              </Card>
+            </div>
+          )}
 
           {/* Feature Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-12">
@@ -79,7 +241,7 @@ const DashboardPage = () => {
                 color: "from-pink-500 to-red-500",
               },
               {
-                icon: Heart,
+                icon: TrendingUp,
                 title: "Mood Tracker",
                 description: "Track your emotional journey and see your progress",
                 color: "from-green-500 to-teal-500",
@@ -92,6 +254,8 @@ const DashboardPage = () => {
                     navigate("/chatroom")
                   } else if (feature.title === "FeelNotes") {
                     navigate("/feelnotes")
+                  } else if (feature.title === "Mood Tracker") {
+                    navigate("/moodtracker")
                   }
                 }}
                 className="bg-white/15 backdrop-blur-md border border-white/30 p-6 rounded-2xl hover:bg-white/20 transition-all duration-300 hover:scale-105 cursor-pointer shadow-lg"
@@ -125,11 +289,19 @@ const DashboardPage = () => {
                 <PenTool className="w-5 h-5 mr-2" />
                 Write a FeelNote
               </button>
+              <button 
+                onClick={() => navigate("/moodtracker")}
+                className="bg-gradient-to-r from-green-500 to-teal-500 hover:from-green-600 hover:to-teal-600 text-white border-0 rounded-full px-8 py-4 text-lg font-semibold shadow-lg hover:shadow-green-500/30 transition-all duration-300 hover:scale-105 flex items-center justify-center"
+              >
+                <TrendingUp className="w-5 h-5 mr-2" />
+                Track My Mood
+              </button>
             </div>
             <p className="text-purple-300 italic opacity-90 mt-6">
               Remember: You're not alone in this journey. We're here for you. 🌙
             </p>
           </div>
+
         </div>
       </div>
     </div>

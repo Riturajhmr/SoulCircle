@@ -1,11 +1,10 @@
-import React, { useState, useEffect } from "react"
-import { X, Mail, Lock, User, Eye, EyeOff, Sparkles, AlertCircle } from "lucide-react"
-import { useAuth } from "../src/contexts/AuthContext"
-import Button from "../src/components/ui/button"
-import Card from "../src/components/ui/card"
+import React, { useState } from "react"
+import { X, Mail, Lock, User, Eye, EyeOff, Sparkles, ArrowRight, Heart } from "lucide-react"
+import { useAuth } from "../contexts/AuthContext"
+import Button from "./ui/button"
+import Card from "./ui/card"
 
-const AuthModal = ({ isOpen, onClose, onSkip, onAuthSuccess }) => {
-  console.log("AuthModal rendered with isOpen:", isOpen)
+const AuthModal = ({ isOpen, onClose, onContinueWithoutAccount }) => {
   const [isLogin, setIsLogin] = useState(true)
   const [showPassword, setShowPassword] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
@@ -16,12 +15,6 @@ const AuthModal = ({ isOpen, onClose, onSkip, onAuthSuccess }) => {
     email: "",
     password: "",
   })
-
-  useEffect(() => {
-    if (currentUser) {
-      onAuthSuccess()
-    }
-  }, [currentUser, onAuthSuccess])
 
   const handleInputChange = (e) => {
     setFormData({
@@ -42,6 +35,8 @@ const AuthModal = ({ isOpen, onClose, onSkip, onAuthSuccess }) => {
     try {
       if (isLogin) {
         await login(formData.email, formData.password)
+        // After successful login, redirect to questions page
+        onContinueWithoutAccount()
       } else {
         if (formData.password.length < 6) {
           setError("Password must be at least 6 characters long!")
@@ -49,8 +44,16 @@ const AuthModal = ({ isOpen, onClose, onSkip, onAuthSuccess }) => {
           return
         }
         await signup(formData.email, formData.password, formData.name)
+        // After successful signup, switch to login mode (don't close modal)
+        setIsLogin(true)
+        setError("")
+        // Clear the form for login
+        setFormData({
+          name: "",
+          email: formData.email, // Keep email for convenience
+          password: "",
+        })
       }
-      onAuthSuccess()
     } catch (error) {
       setError(error.message)
     } finally {
@@ -58,24 +61,24 @@ const AuthModal = ({ isOpen, onClose, onSkip, onAuthSuccess }) => {
     }
   }
 
+  const handleContinueWithoutAccount = () => {
+    onContinueWithoutAccount()
+    onClose()
+  }
+
   if (!isOpen) return null
 
   return (
     <div className="fixed inset-0 z-[9999] flex items-center justify-center p-4">
       {/* Backdrop */}
-      <div className="absolute inset-0 bg-black/60 backdrop-blur-sm" onClick={onClose} />
-
-      {/* Modal */}
-      <Card className="relative w-full max-w-md mx-4 bg-white/95 backdrop-blur-md border-white/30 shadow-2xl">
-        <div
-          className="absolute inset-0 rounded-lg"
-          style={{
-            background:
-              "linear-gradient(135deg, rgba(30, 33, 93, 0.1) 0%, rgba(148, 97, 253, 0.1) 40%, rgba(217, 175, 223, 0.1) 100%)",
-          }}
-        />
-
-        <div className="relative p-8">
+      <div 
+        className="absolute inset-0 bg-black/50 backdrop-blur-sm"
+        onClick={onClose}
+      />
+      
+      {/* Modal Card */}
+      <Card className="relative w-full max-w-md bg-white/95 backdrop-blur-md border-white/30 shadow-2xl">
+        <div className="p-8">
           {/* Close Button */}
           <button
             onClick={onClose}
@@ -88,19 +91,26 @@ const AuthModal = ({ isOpen, onClose, onSkip, onAuthSuccess }) => {
           <div className="text-center mb-8">
             <div className="flex items-center justify-center mb-4">
               <div className="w-12 h-12 bg-gradient-to-r from-purple-500 to-pink-500 rounded-full flex items-center justify-center">
-                <Sparkles className="w-6 h-6 text-white" />
+                <Heart className="w-6 h-6 text-white" />
               </div>
             </div>
-            <h2 className="text-2xl font-bold text-gray-800 mb-2">{isLogin ? "Welcome Back" : "Join SoulCircle"}</h2>
+            <h2 className="text-2xl font-bold text-gray-800 mb-2">
+              {isLogin ? "Welcome Back" : "Join SoulCircle"}
+            </h2>
             <p className="text-gray-600">
               {isLogin ? "Sign in to continue your healing journey" : "Create your account to start your journey"}
             </p>
+            {isLogin && formData.email && !formData.password && (
+              <div className="mt-2 p-2 bg-green-100 border border-green-300 text-green-700 rounded-lg text-sm">
+                ✅ Account created! Please sign in to continue.
+              </div>
+            )}
           </div>
 
           {/* Error Message */}
           {error && (
             <div className="mb-4 p-3 bg-red-100 border border-red-400 text-red-700 rounded-lg flex items-center">
-              <AlertCircle className="w-5 h-5 mr-2" />
+              <Sparkles className="w-5 h-5 mr-2" />
               {error}
             </div>
           )}
@@ -161,7 +171,7 @@ const AuthModal = ({ isOpen, onClose, onSkip, onAuthSuccess }) => {
                   onChange={handleInputChange}
                   required
                   className="w-full pl-10 pr-12 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent transition-all duration-200 bg-white/80"
-                  placeholder="Enter your password"
+                  placeholder={isLogin ? "Enter your password" : "Create a password"}
                 />
                 <button
                   type="button"
@@ -206,14 +216,15 @@ const AuthModal = ({ isOpen, onClose, onSkip, onAuthSuccess }) => {
             </p>
           </div>
 
-          {/* Skip Button */}
+          {/* Continue Without Account Button */}
           <div className="text-center mt-6 pt-6 border-t border-gray-200">
             <p className="text-sm text-gray-500 mb-3">Want to explore first?</p>
             <Button
-              onClick={onSkip}
+              onClick={handleContinueWithoutAccount}
               variant="outline"
               className="w-full border-gray-300 text-gray-600 hover:bg-gray-50 transition-all duration-200 bg-transparent"
             >
+              <ArrowRight className="w-4 h-4 mr-2" />
               Continue Without Account
             </Button>
           </div>

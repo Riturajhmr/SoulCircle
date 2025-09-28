@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react"
 import { Moon, Star, Sparkles, ArrowLeft, ArrowRight, X } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../src/contexts/AuthContext"
+import { useUserData } from "../src/hooks/useUserData"
 import Button from "../src/components/ui/button"
 import Card from "../src/components/ui/card"
 
@@ -53,7 +55,46 @@ const QuestionsPage = () => {
   const [currentStep, setCurrentStep] = useState(1)
   const [selectedOption, setSelectedOption] = useState("")
   const [answers, setAnswers] = useState({})
+  const [isCheckingPreviousAnswers, setIsCheckingPreviousAnswers] = useState(true)
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
+  const { trackActivity, saveResponses, questionResponses, loading } = useUserData()
+
+  // Check if user has already answered questions
+  useEffect(() => {
+    const checkPreviousAnswers = async () => {
+      if (currentUser && !loading) {
+        // Check if user has question responses in Firebase
+        if (questionResponses && questionResponses.responses) {
+          console.log('✅ User has already answered questions, redirecting to dashboard')
+          navigate('/dashboard')
+          return
+        }
+        
+        // Check localStorage as backup
+        const savedAnswers = localStorage.getItem("soulcircle-answers")
+        if (savedAnswers) {
+          try {
+            const parsedAnswers = JSON.parse(savedAnswers)
+            if (Object.keys(parsedAnswers).length === questions.length) {
+              console.log('✅ User has completed questions in localStorage, redirecting to dashboard')
+              navigate('/dashboard')
+              return
+            }
+          } catch (error) {
+            console.error('Error parsing saved answers:', error)
+          }
+        }
+        
+        setIsCheckingPreviousAnswers(false)
+      } else if (!currentUser) {
+        // If no user, redirect to login
+        navigate('/login')
+      }
+    }
+
+    checkPreviousAnswers()
+  }, [currentUser, questionResponses, loading, navigate])
 
   useEffect(() => {
     setSelectedOption(answers[currentStep] || "")
@@ -65,12 +106,52 @@ const QuestionsPage = () => {
     setAnswers(newAnswers)
   }
 
-  const handleNext = () => {
+  const handleNext = async () => {
     if (!selectedOption) return
+    
+    // Track question answered activity
+    if (currentUser) {
+      try {
+        await trackActivity({
+          type: 'question_answered',
+          description: `Answered question ${currentStep}: ${questions[currentStep - 1].question}`,
+          metadata: {
+            questionId: currentStep,
+            answer: selectedOption,
+            questionText: questions[currentStep - 1].question
+          }
+        })
+      } catch (error) {
+        console.error('Error tracking activity:', error)
+      }
+    }
+    
     if (currentStep === questions.length) {
-      // Store answers in localStorage and navigate to welcome page
+      // Save complete responses to Firebase
+      if (currentUser) {
+        try {
+          // Save all responses to Firebase
+          await saveResponses(answers)
+          
+          // Track completion activity
+          await trackActivity({
+            type: 'questions_completed',
+            description: 'Completed onboarding questions',
+            metadata: {
+              totalQuestions: questions.length,
+              completedAt: new Date().toISOString()
+            }
+          })
+          
+          console.log('✅ All question responses saved to Firebase for user:', currentUser.uid)
+        } catch (error) {
+          console.error('Error saving responses to Firebase:', error)
+        }
+      }
+      
+      // Store answers in localStorage as backup
       localStorage.setItem("soulcircle-answers", JSON.stringify(answers))
-      navigate("/welcome")
+      navigate("/dashboard")
     } else {
       setCurrentStep(currentStep + 1)
     }
@@ -91,6 +172,23 @@ const QuestionsPage = () => {
   const currentQuestion = questions.find((q) => q.id === currentStep)
   const isFirstStep = currentStep === 1
   const isLastStep = currentStep === questions.length
+
+  // Show loading while checking previous answers
+  if (isCheckingPreviousAnswers) {
+    return (
+      <div
+        className="min-h-screen relative overflow-hidden flex items-center justify-center"
+        style={{
+          background: "linear-gradient(135deg, #1e215d 0%, #9461fd 40%, #d9afdf 100%)",
+        }}
+      >
+        <div className="text-center text-white">
+          <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-white mx-auto mb-4"></div>
+          <p className="text-xl">Checking your previous answers...</p>
+        </div>
+      </div>
+    )
+  }
 
   return (
     <div

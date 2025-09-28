@@ -1,0 +1,18 @@
+{
+  "rules": {
+    "status": {
+      "$userId": {
+        ".read": "auth != null",
+        ".write": "auth != null && auth.uid == $userId"
+      }
+    },
+    "typing": {
+      "$roomId": {
+        "$userId": {
+          ".read": "auth != null",
+          ".write": "auth != null && auth.uid == $userId"
+        }
+      }
+    }
+  }
+}

@@ -1,126 +1,49 @@
-import React, { useState, useEffect, useRef } from "react"
-import { Star, Send, Users, MessageCircle, ArrowLeft, Clock } from "lucide-react"
-import { useNavigate } from "react-router-dom"
-import Button from "../src/components/ui/button"
-import Card from "../src/components/ui/card"
-import Input from "../src/components/ui/input"
-
-const emotions = ["😊", "😢", "😰", "😡", "😴", "🤗", "💜", "🌟"]
-const userColors = [
-  "text-purple-300",
-  "text-pink-300",
-  "text-blue-300",
-  "text-green-300",
-  "text-yellow-300",
-  "text-orange-300",
-  "text-red-300",
-  "text-indigo-300",
-]
+import React, { useState, useEffect } from 'react'
+import { ArrowLeft, MessageCircle, Users, Wifi } from 'lucide-react'
+import { useNavigate } from 'react-router-dom'
+import { useAuth } from '../src/contexts/AuthContext'
+import { setUserOnline, setUserOffline } from '../src/services/chatService'
+import ChatRoom from '../src/components/chat/ChatRoom'
+import RoomList from '../src/components/chat/RoomList'
+import Button from '../src/components/ui/button'
 
 const ChatroomPage = () => {
-  const [messages, setMessages] = useState([])
-  const [currentMessage, setCurrentMessage] = useState("")
-  const [username, setUsername] = useState("")
-  const [isJoined, setIsJoined] = useState(false)
-  const [onlineUsers, setOnlineUsers] = useState([])
-  const [selectedEmotion, setSelectedEmotion] = useState("")
-  const messagesEndRef = useRef(null)
-  const [userColor, setUserColor] = useState("")
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
+  const [selectedRoom, setSelectedRoom] = useState(null)
+  const [isConnected, setIsConnected] = useState(true)
 
-  // Simulate real-time messaging (in a real app, you'd use WebSocket or similar)
+  // Set user online when entering chat
   useEffect(() => {
-    if (isJoined) {
-      // Simulate other users joining and sending messages
-      const interval = setInterval(() => {
-        if (Math.random() > 0.7) {
-          const randomUsers = ["Anonymous Soul", "Peaceful Mind", "Hopeful Heart", "Gentle Spirit", "Caring Friend"]
-          const randomMessages = [
-            "I'm feeling better today, thanks to everyone here 💜",
-            "Sometimes it's okay to not be okay",
-            "This community gives me hope",
-            "Sending virtual hugs to everyone 🤗",
-            "You're not alone in this journey",
-            "Taking it one day at a time",
-            "Grateful for this safe space",
-          ]
-          const newMessage = {
-            id: Date.now().toString() + Math.random(),
-            username: randomUsers[Math.floor(Math.random() * randomUsers.length)],
-            message: randomMessages[Math.floor(Math.random() * randomMessages.length)],
-            timestamp: new Date(),
-            emotion: emotions[Math.floor(Math.random() * emotions.length)],
-            color: userColors[Math.floor(Math.random() * userColors.length)],
-          }
-          setMessages((prev) => [...prev, newMessage])
-        }
-      }, 8000)
-      return () => clearInterval(interval)
-    }
-  }, [isJoined])
+    if (currentUser) {
+      setUserOnline(currentUser.uid, {
+        displayName: currentUser.displayName || 'Anonymous',
+        email: currentUser.email
+      }, selectedRoom?.id)
 
-  useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: "smooth" })
-  }, [messages])
-
-  const handleJoinChat = () => {
-    if (username.trim()) {
-      setIsJoined(true)
-      setUserColor(userColors[Math.floor(Math.random() * userColors.length)])
-      // Add welcome message
-      const welcomeMessage = {
-        id: Date.now().toString(),
-        username: "SoulCircle",
-        message: `Welcome ${username}! Feel free to share what's on your mind. 💜`,
-        timestamp: new Date(),
-        color: "text-purple-400",
-      }
-      setMessages([welcomeMessage])
-      // Simulate online users
-      setOnlineUsers([
-        { id: "1", username: "Anonymous Soul", color: "text-purple-300", isOnline: true },
-        { id: "2", username: "Peaceful Mind", color: "text-pink-300", isOnline: true },
-        { id: "3", username: "Hopeful Heart", color: "text-blue-300", isOnline: true },
-        { id: "4", username: username, color: userColor, isOnline: true },
-      ])
-    }
-  }
-
-  const handleSendMessage = () => {
-    if (currentMessage.trim()) {
-      const newMessage = {
-        id: Date.now().toString(),
-        username: username,
-        message: currentMessage,
-        timestamp: new Date(),
-        emotion: selectedEmotion,
-        color: userColor,
-      }
-      setMessages((prev) => [...prev, newMessage])
-      setCurrentMessage("")
-      setSelectedEmotion("")
-    }
-  }
-
-  const handleKeyPress = (e) => {
-    if (e.key === "Enter") {
-      if (isJoined) {
-        handleSendMessage()
-      } else {
-        handleJoinChat()
+      // Set offline when leaving
+      return () => {
+        setUserOffline(currentUser.uid)
       }
     }
+  }, [currentUser, selectedRoom?.id])
+
+  // Handle room selection
+  const handleRoomSelect = (room) => {
+    setSelectedRoom(room)
   }
 
-  const formatTime = (date) => {
-    return date.toLocaleTimeString([], { hour: "2-digit", minute: "2-digit" })
+  // Handle back to room list
+  const handleBackToRooms = () => {
+    setSelectedRoom(null)
   }
 
-  const handleGoBack = () => {
-    navigate("/dashboard")
+  // Handle create room
+  const handleCreateRoom = () => {
+    // This will be handled by the RoomList component
   }
 
-  if (!isJoined) {
+  if (!currentUser) {
     return (
       <div
         className="min-h-screen relative overflow-hidden flex items-center justify-center"
@@ -128,58 +51,16 @@ const ChatroomPage = () => {
           background: "linear-gradient(135deg, #1e215d 0%, #9461fd 40%, #d9afdf 100%)",
         }}
       >
-        {/* Animated Stars Background */}
-        <div className="absolute inset-0">
-          {[...Array(60)].map((_, i) => (
-            <div
-              key={i}
-              className="absolute animate-twinkle"
-              style={{
-                left: `${Math.random() * 100}%`,
-                top: `${Math.random() * 100}%`,
-                animationDelay: `${Math.random() * 4}s`,
-                animationDuration: `${2 + Math.random() * 3}s`,
-              }}
-            >
-              <Star className="w-1 h-1 text-white opacity-60 fill-current" />
-            </div>
-          ))}
+        <div className="text-center text-white">
+          <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
+          <p className="text-xl mb-4">Please log in to access chat rooms</p>
+          <Button 
+            onClick={() => navigate('/login')} 
+            className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white"
+          >
+            Go to Login
+          </Button>
         </div>
-        <Card className="w-full max-w-md p-8 bg-gradient-to-br from-slate-900/95 via-purple-900/95 to-slate-900/95 backdrop-blur-md border-white/30 rounded-3xl">
-          <div className="text-center mb-8">
-            <div className="flex items-center justify-center space-x-3 mb-4">
-              <MessageCircle className="w-8 h-8 text-purple-200" />
-              <h1 className="text-2xl font-bold text-white">Join Chat Room</h1>
-            </div>
-            <p className="text-purple-200">Enter a username to start chatting anonymously</p>
-          </div>
-          <div className="space-y-4">
-            <Input
-              type="text"
-              placeholder="Choose your anonymous name..."
-              value={username}
-              onChange={(e) => setUsername(e.target.value)}
-              onKeyPress={handleKeyPress}
-              className="bg-white/10 border-white/20 text-white placeholder:text-purple-300 rounded-xl"
-            />
-            <Button
-              onClick={handleJoinChat}
-              disabled={!username.trim()}
-              className="w-full bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 rounded-xl py-3"
-            >
-              <MessageCircle className="w-4 h-4 mr-2" />
-              Join Chat Room
-            </Button>
-            <Button
-              onClick={handleGoBack}
-              variant="outline"
-              className="w-full border-white/20 text-white hover:bg-white/10 bg-transparent rounded-xl"
-            >
-              <ArrowLeft className="w-4 h-4 mr-2" />
-              Back to Dashboard
-            </Button>
-          </div>
-        </Card>
       </div>
     )
   }
@@ -204,108 +85,107 @@ const ChatroomPage = () => {
               animationDuration: `${2 + Math.random() * 3}s`,
             }}
           >
-            <Star className="w-1 h-1 text-white opacity-60 fill-current" />
+            <div className="w-1 h-1 bg-white opacity-60 rounded-full"></div>
           </div>
         ))}
       </div>
 
       {/* Header */}
-      <div className="flex items-center justify-between p-4 bg-white/10 backdrop-blur-md border-b border-white/20">
-        <div className="flex items-center space-x-3">
-          <MessageCircle className="w-6 h-6 text-purple-200" />
-          <h1 className="text-xl font-bold text-white">SoulCircle Chat</h1>
-        </div>
-        <div className="flex items-center space-x-4">
-          <div className="flex items-center space-x-2">
-            <Users className="w-4 h-4 text-purple-300" />
-            <span className="text-purple-200 text-sm">{onlineUsers.length} online</span>
+      <div className="fixed top-0 w-full z-50 backdrop-blur-md bg-white/10 border-b border-white/20">
+        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+          <div className="flex justify-between items-center py-4">
+            <div className="flex items-center space-x-4">
+              <Button
+                onClick={() => navigate('/dashboard')}
+                className="bg-white/20 hover:bg-white/30 text-white border-white/30 rounded-full px-6 py-2"
+              >
+                <ArrowLeft className="w-4 h-4 mr-2" />
+                Back to Dashboard
+              </Button>
+              <div className="flex items-center space-x-2">
+                <MessageCircle className="w-6 h-6 text-purple-200" />
+                <span className="text-white font-semibold text-lg">SoulCircle Chat</span>
+              </div>
+            </div>
+            
+            {/* Connection Status */}
+            <div className="flex items-center space-x-2 text-sm text-purple-200">
+              <Wifi className={`w-4 h-4 ${isConnected ? 'text-green-400' : 'text-red-400'}`} />
+              <span>{isConnected ? 'Connected' : 'Disconnected'}</span>
+            </div>
           </div>
-          <Button
-            onClick={handleGoBack}
-            variant="outline"
-            size="sm"
-            className="border-white/20 text-white hover:bg-white/10 bg-transparent"
-          >
-            <ArrowLeft className="w-4 h-4 mr-2" />
-            Back
-          </Button>
         </div>
       </div>
 
-      <div className="flex h-[calc(100vh-80px)]">
-        {/* Online Users Sidebar */}
-        <div className="w-64 bg-white/5 backdrop-blur-sm border-r border-white/20 p-4">
-          <h3 className="text-white font-semibold mb-4 flex items-center">
-            <Users className="w-4 h-4 mr-2" />
-            Online Now
-          </h3>
-          <div className="space-y-2">
-            {onlineUsers.map((user) => (
-              <div key={user.id} className="flex items-center space-x-2">
-                <div className="w-2 h-2 bg-green-400 rounded-full animate-pulse"></div>
-                <span className={`text-sm ${user.color}`}>{user.username}</span>
-              </div>
-            ))}
-          </div>
-        </div>
-
-        {/* Chat Area */}
-        <div className="flex-1 flex flex-col">
-          {/* Messages */}
-          <div className="flex-1 overflow-y-auto p-4 space-y-4">
-            {messages.map((message) => (
-              <div key={message.id} className="flex flex-col space-y-1">
-                <div className="flex items-center space-x-2">
-                  <span className={`text-sm font-medium ${message.color}`}>{message.username}</span>
-                  <span className="text-xs text-purple-300 flex items-center">
-                    <Clock className="w-3 h-3 mr-1" />
-                    {formatTime(message.timestamp)}
-                  </span>
-                  {message.emotion && <span className="text-sm">{message.emotion}</span>}
-                </div>
-                <div className="bg-white/10 backdrop-blur-sm rounded-xl p-3 max-w-md">
-                  <p className="text-white">{message.message}</p>
-                </div>
-              </div>
-            ))}
-            <div ref={messagesEndRef} />
+      {/* Main Content */}
+      <div className="pt-20 px-6 lg:px-8">
+        <div className="max-w-7xl mx-auto">
+          {/* Welcome Header */}
+          <div className="text-center mb-8">
+            <h1 className="text-4xl md:text-5xl font-bold text-white mb-4">
+              Welcome to
+              <span className="bg-gradient-to-r from-purple-200 to-pink-200 bg-clip-text text-transparent block">
+                SoulCircle Chat
+              </span>
+            </h1>
+            <p className="text-xl text-purple-200 max-w-2xl mx-auto">
+              Connect with others who understand. Share your thoughts, find support, and build meaningful connections in our safe community spaces.
+            </p>
           </div>
 
-          {/* Message Input */}
-          <div className="p-4 bg-white/5 backdrop-blur-sm border-t border-white/20">
-            {/* Emotion Selector */}
-            <div className="flex items-center space-x-2 mb-3">
-              <span className="text-purple-200 text-sm">Feeling:</span>
-              {emotions.map((emotion) => (
-                <button
-                  key={emotion}
-                  onClick={() => setSelectedEmotion(selectedEmotion === emotion ? "" : emotion)}
-                  className={`p-2 rounded-lg transition-all duration-200 ${
-                    selectedEmotion === emotion ? "bg-purple-500/30 scale-110" : "bg-white/10 hover:bg-white/20"
-                  }`}
-                >
-                  {emotion}
-                </button>
-              ))}
+          {/* Chat Interface */}
+          <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 h-[calc(100vh-200px)]">
+            {/* Room List */}
+            <div className="lg:col-span-1">
+              <RoomList 
+                onRoomSelect={handleRoomSelect}
+                onCreateRoom={handleCreateRoom}
+              />
             </div>
 
-            {/* Message Input */}
-            <div className="flex space-x-2">
-              <Input
-                type="text"
-                placeholder="Share what's on your mind..."
-                value={currentMessage}
-                onChange={(e) => setCurrentMessage(e.target.value)}
-                onKeyPress={handleKeyPress}
-                className="flex-1 bg-white/10 border-white/20 text-white placeholder:text-purple-300 rounded-xl"
-              />
-              <Button
-                onClick={handleSendMessage}
-                disabled={!currentMessage.trim()}
-                className="bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 text-white border-0 rounded-xl px-6"
-              >
-                <Send className="w-4 h-4" />
-              </Button>
+            {/* Chat Room */}
+            <div className="lg:col-span-2">
+              {selectedRoom ? (
+                <ChatRoom 
+                  room={selectedRoom}
+                  onBack={handleBackToRooms}
+                />
+              ) : (
+                <div className="h-full bg-white/5 backdrop-blur-md rounded-2xl flex items-center justify-center">
+                  <div className="text-center text-white">
+                    <MessageCircle className="w-16 h-16 mx-auto mb-4 opacity-50" />
+                    <h3 className="text-xl font-semibold mb-2">Select a Chat Room</h3>
+                    <p className="text-purple-200">
+                      Choose a room from the list to start chatting, or create a new one!
+                    </p>
+                  </div>
+                </div>
+              )}
+            </div>
+          </div>
+
+          {/* Features Info */}
+          <div className="mt-8 grid grid-cols-1 md:grid-cols-3 gap-6">
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl text-center">
+              <Users className="w-8 h-8 text-purple-300 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-white mb-2">Real-time Chat</h3>
+              <p className="text-purple-200 text-sm">
+                Connect instantly with others through live messaging and see who's online.
+              </p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl text-center">
+              <MessageCircle className="w-8 h-8 text-purple-300 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-white mb-2">Safe Spaces</h3>
+              <p className="text-purple-200 text-sm">
+                Join supportive communities where you can share openly and find understanding.
+              </p>
+            </div>
+            <div className="bg-white/10 backdrop-blur-md border border-white/20 p-6 rounded-2xl text-center">
+              <Wifi className="w-8 h-8 text-purple-300 mx-auto mb-3" />
+              <h3 className="text-lg font-semibold text-white mb-2">Always Connected</h3>
+              <p className="text-purple-200 text-sm">
+                Stay connected with offline support and automatic reconnection.
+              </p>
             </div>
           </div>
         </div>
