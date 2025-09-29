@@ -6,7 +6,7 @@ import {
 } from "react-router-dom";
 import { AuthProvider } from "./contexts/AuthContext";
 
-import SoulCircleHero from "../pages/LandingPage";
+import SoulCircleHero from "../pages/landingpage";
 import LoginPage from "../pages/loginpage";
 import SignupPage from "../pages/signuppage";
 import QuestionsPage from "../pages/questionpages";

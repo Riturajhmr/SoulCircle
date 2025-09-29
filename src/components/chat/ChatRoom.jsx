@@ -9,6 +9,7 @@ import {
   listenToPresence,
   addReaction,
   removeReaction,
+  archiveRoom,
   formatMessageTime,
   getOnlineUsers,
   getTypingUsers
@@ -139,6 +140,22 @@ const ChatRoom = ({ room, onBack, onUserClick }) => {
     return 'Several people are typing...'
   }
 
+  // Delete (archive) room - only creator can see/use
+  const canDeleteRoom = currentUser && room?.createdBy === currentUser.uid
+  const handleDeleteRoom = async () => {
+    if (!canDeleteRoom) return
+    const confirmed = window.confirm('Delete this room for everyone? This will archive the room and hide it from the list.')
+    if (!confirmed) return
+    try {
+      await archiveRoom(room.id, currentUser.uid)
+      alert('Room deleted (archived).')
+      onBack && onBack()
+    } catch (e) {
+      console.error(e)
+      alert(e.message || 'Failed to delete room')
+    }
+  }
+
   if (isLoading) {
     return (
       <div className="flex items-center justify-center h-full">
@@ -174,11 +191,22 @@ const ChatRoom = ({ room, onBack, onUserClick }) => {
             </div>
           </div>
         </div>
-        <Button
-          className="bg-white/20 hover:bg-white/30 text-white border-white/30 rounded-full p-2"
-        >
-          <MoreVertical className="w-4 h-4" />
-        </Button>
+        <div className="flex items-center space-x-2">
+          {canDeleteRoom && (
+            <Button
+              onClick={handleDeleteRoom}
+              className="bg-red-500/20 hover:bg-red-500/30 text-white border-red-300/30 rounded-full px-3 py-2"
+              title="Delete room"
+            >
+              Delete
+            </Button>
+          )}
+          <Button
+            className="bg-white/20 hover:bg-white/30 text-white border-white/30 rounded-full p-2"
+          >
+            <MoreVertical className="w-4 h-4" />
+          </Button>
+        </div>
       </div>
 
       {/* Messages */}

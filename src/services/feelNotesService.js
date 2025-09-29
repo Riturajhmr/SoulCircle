@@ -11,7 +11,8 @@ import {
   orderBy, 
   onSnapshot,
   serverTimestamp,
-  limit
+  limit,
+  collectionGroup
 } from '../firebase';
 
 // User-specific FeelNotes Management
@@ -65,41 +66,20 @@ export const getUserFeelNotes = async (userId, limitCount = 50) => {
 // Community FeelNotes Management (All users' notes)
 export const getAllFeelNotes = async (limitCount = 100) => {
   try {
-    // Get all users first
-    const usersRef = collection(db, 'users');
-    const usersSnapshot = await getDocs(usersRef);
-    
+    // Collection group query across all users' feelNotes
+    const cg = collectionGroup(db, 'feelNotes');
+    const qAll = query(cg, orderBy('createdAt', 'desc'), limit(limitCount));
+    const snapshot = await getDocs(qAll);
     const allFeelNotes = [];
-    
-    // Get FeelNotes from each user
-    for (const userDoc of usersSnapshot.docs) {
-      const userId = userDoc.id;
-      const userFeelNotesRef = collection(db, 'users', userId, 'feelNotes');
-      const q = query(
-        userFeelNotesRef, 
-        orderBy('createdAt', 'desc'),
-        limit(20) // Limit per user to avoid too many notes
-      );
-      
-      const querySnapshot = await getDocs(q);
-      querySnapshot.forEach((doc) => {
-        allFeelNotes.push({
-          id: doc.id,
-          ...doc.data(),
-          // Remove authorId for anonymity
-          authorId: undefined
-        });
+    snapshot.forEach((docSnap) => {
+      const data = docSnap.data();
+      allFeelNotes.push({
+        id: docSnap.id,
+        ...data,
+        authorId: undefined
       });
-    }
-    
-    // Sort all notes by creation time
-    allFeelNotes.sort((a, b) => {
-      const aTime = a.createdAt?.seconds || 0;
-      const bTime = b.createdAt?.seconds || 0;
-      return bTime - aTime;
     });
-    
-    return allFeelNotes.slice(0, limitCount);
+    return allFeelNotes;
   } catch (error) {
     console.error('❌ Error getting all FeelNotes:', error);
     throw error;

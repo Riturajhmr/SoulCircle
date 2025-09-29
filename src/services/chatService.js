@@ -97,6 +97,27 @@ export const updateRoom = async (roomId, updates) => {
   }
 };
 
+// Soft delete (archive) a room by owner
+export const archiveRoom = async (roomId, currentUserId) => {
+  try {
+    const roomRef = doc(db, 'rooms', roomId);
+    const snap = await getDoc(roomRef);
+    if (!snap.exists()) throw new Error('Room not found');
+    const data = snap.data();
+    if (data.createdBy !== currentUserId) {
+      throw new Error('Only the room creator can delete this room');
+    }
+    await updateDoc(roomRef, {
+      isActive: false,
+      archivedAt: serverTimestamp(),
+      archivedBy: currentUserId
+    });
+  } catch (error) {
+    console.error('❌ Error archiving room:', error);
+    throw error;
+  }
+};
+
 // Message Management
 export const sendMessage = async (roomId, messageData) => {
   try {
