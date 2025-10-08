@@ -2,7 +2,7 @@
 import { initializeApp } from "firebase/app";
 import { getAnalytics } from "firebase/analytics";
 import { getAuth, createUserWithEmailAndPassword, signInWithEmailAndPassword, signOut, onAuthStateChanged, updateProfile } from "firebase/auth";
-import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, limit, updateDoc, deleteDoc, collectionGroup } from "firebase/firestore";
+import { getFirestore, collection, doc, setDoc, getDoc, getDocs, addDoc, query, where, orderBy, onSnapshot, serverTimestamp, limit, updateDoc, deleteDoc, collectionGroup, arrayUnion, arrayRemove, increment } from "firebase/firestore";
 import { getDatabase } from "firebase/database";
 
 // Your web app's Firebase configuration
@@ -49,6 +49,9 @@ export {
   limit,
   updateDoc,
   deleteDoc,
-  collectionGroup
+  collectionGroup,
+  arrayUnion,
+  arrayRemove,
+  increment
 };
 export default app;

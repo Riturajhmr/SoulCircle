@@ -71,8 +71,15 @@ const RoomList = ({ onRoomSelect, onCreateRoom }) => {
       setNewRoom({ name: '', description: '' })
       setShowCreateForm(false)
       
-      // Select the newly created room
-      const newRoomData = { id: roomId, ...newRoom }
+      // Select the newly created room with ownership fields so owner actions (Delete) are enabled immediately
+      const newRoomData = { 
+        id: roomId, 
+        name: newRoom.name.trim(), 
+        description: newRoom.description.trim(), 
+        createdBy: currentUser.uid,
+        createdByName: currentUser.displayName || 'Anonymous',
+        isActive: true
+      }
       onRoomSelect(newRoomData)
     } catch (error) {
       console.error('Error creating room:', error)

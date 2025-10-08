@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react"
-import { Moon, Heart, MessageCircle, Users, PenTool, Star, TrendingUp, User, LogOut } from "lucide-react"
+import { Moon, Heart, MessageCircle, Users, PenTool, Star, TrendingUp, User, LogOut, Mail } from "lucide-react"
 import { useNavigate } from "react-router-dom"
 import { useAuth } from "../src/contexts/AuthContext"
 import { useUserData } from "../src/hooks/useUserData"
@@ -12,7 +12,8 @@ const DashboardPage = () => {
   const { 
     userProfile, 
     userActivities,
-    trackActivity
+    trackActivity,
+    refreshData
   } = useUserData()
 
   const [showMoodCheck, setShowMoodCheck] = useState(false)
@@ -28,38 +29,38 @@ const DashboardPage = () => {
   // Check if user has answered mood question today
   useEffect(() => {
     const checkTodayMood = () => {
-      if (currentUser) {
-        const today = new Date().toDateString()
-        
-        // Check localStorage first (faster)
-        const lastMoodCheck = localStorage.getItem(`moodCheck_${currentUser.uid}`)
-        if (lastMoodCheck === today) {
-          console.log('✅ Mood already checked today (localStorage)')
-          return
+      if (!currentUser) return
+
+      const today = new Date().toDateString()
+
+      // Check localStorage first (fast path)
+      const lastMoodCheck = localStorage.getItem(`moodCheck_${currentUser.uid}`)
+      if (lastMoodCheck === today) return
+
+      // Prefer Firestore server timestamp when available
+      const getActivityDateString = (activity) => {
+        if (activity?.timestamp?.seconds) {
+          return new Date(activity.timestamp.seconds * 1000).toDateString()
         }
-        
-        // Check Firebase activities
-        if (userActivities) {
-          const todayMood = userActivities.find(activity => 
-            activity.type === 'mood_check' && 
-            new Date(activity.metadata?.date || activity.timestamp?.seconds * 1000).toDateString() === today
-          )
-          if (todayMood) {
-            console.log('✅ Mood already checked today (Firebase)')
-            // Update localStorage
-            localStorage.setItem(`moodCheck_${currentUser.uid}`, today)
-            return
-          }
+        if (activity?.metadata?.date) {
+          return new Date(activity.metadata.date).toDateString()
         }
-        
-        // If no mood check found for today, show the modal
-        console.log('❌ No mood check found for today, showing modal')
-        setShowMoodCheck(true)
+        return ''
       }
+
+      const todayMood = (userActivities || []).find((activity) =>
+        activity.type === 'mood_check' && getActivityDateString(activity) === today
+      )
+
+      if (todayMood) {
+        localStorage.setItem(`moodCheck_${currentUser.uid}`, today)
+        return
+      }
+
+      setShowMoodCheck(true)
     }
-    
-    // Add a small delay to ensure userActivities is loaded
-    const timer = setTimeout(checkTodayMood, 1000)
+
+    const timer = setTimeout(checkTodayMood, 800)
     return () => clearTimeout(timer)
   }, [currentUser, userActivities])
 
@@ -74,8 +75,7 @@ const DashboardPage = () => {
         metadata: {
           mood: mood,
           emoji: selectedMood?.emoji || '❓',
-          date: new Date().toISOString(),
-          timestamp: new Date().toISOString()
+          date: new Date().toISOString()
         }
       })
       
@@ -227,37 +227,40 @@ const DashboardPage = () => {
                 title: "Chat Rooms",
                 description: "Join emotion-based conversations with others who understand",
                 color: "from-blue-500 to-purple-500",
+                route: "/chatroom"
+              },
+              {
+                icon: Mail,
+                title: "Direct Messages",
+                description: "Have private one-on-one conversations",
+                color: "from-indigo-500 to-purple-500",
+                route: "/dms"
               },
               {
                 icon: PenTool,
                 title: "FeelNotes",
                 description: "Share your story anonymously or read others' experiences",
                 color: "from-purple-500 to-pink-500",
+                route: "/feelnotes"
               },
               {
                 icon: Users,
                 title: "Support Circles",
                 description: "Join small, intimate groups for deeper connections",
                 color: "from-pink-500 to-red-500",
+                route: "/supportcircles"
               },
               {
                 icon: TrendingUp,
                 title: "Mood Tracker",
                 description: "Track your emotional journey and see your progress",
                 color: "from-green-500 to-teal-500",
+                route: "/moodtracker"
               },
             ].map((feature, index) => (
               <div
                 key={index}
-                onClick={() => {
-                  if (feature.title === "Chat Rooms") {
-                    navigate("/chatroom")
-                  } else if (feature.title === "FeelNotes") {
-                    navigate("/feelnotes")
-                  } else if (feature.title === "Mood Tracker") {
-                    navigate("/moodtracker")
-                  }
-                }}
+                onClick={() => navigate(feature.route)}
                 className="bg-white/15 backdrop-blur-md border border-white/30 p-6 rounded-2xl hover:bg-white/20 transition-all duration-300 hover:scale-105 cursor-pointer shadow-lg"
               >
                 <div

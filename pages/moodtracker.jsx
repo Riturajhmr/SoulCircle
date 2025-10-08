@@ -1,6 +1,8 @@
 import React, { useState, useEffect } from "react"
 import { Moon, Star, Heart, Calendar, TrendingUp, ArrowLeft, Plus, Edit3 } from "lucide-react"
 import { useNavigate } from "react-router-dom"
+import { useAuth } from "../src/contexts/AuthContext"
+import { saveMoodEntry, getMoodEntries, getTodaysMoodEntry } from "../src/services/userDataService"
 import Button from "../src/components/ui/button"
 import Card from "../src/components/ui/card"
 
@@ -19,7 +21,10 @@ const MoodTrackerPage = () => {
   const [note, setNote] = useState("")
   const [showAddForm, setShowAddForm] = useState(false)
   const [view, setView] = useState("today")
+  const [loading, setLoading] = useState(true)
+  const [error, setError] = useState("")
   const navigate = useNavigate()
+  const { currentUser } = useAuth()
 
   // Helper function to safely get mood name
   const getMoodName = (mood) => {
@@ -30,56 +35,62 @@ const MoodTrackerPage = () => {
   }
 
   useEffect(() => {
-    // Load mood entries from localStorage
-    const savedEntries = localStorage.getItem("soulcircle-mood-entries")
-    if (savedEntries) {
-      try {
-        const parsedEntries = JSON.parse(savedEntries)
-        // Ensure entries is always an array and normalize entry format
-        const validEntries = Array.isArray(parsedEntries) 
-          ? parsedEntries.map(entry => {
-              if (!entry || !entry.id || !entry.date) return null
-              
-              // Normalize mood format
-              return {
-                ...entry,
-                mood: getMoodName(entry.mood),
-              }
-            }).filter(entry => entry !== null)
-          : []
-        setEntries(validEntries)
-      } catch (error) {
-        console.error("Error parsing saved mood entries:", error)
-        // Clear corrupted data
-        localStorage.removeItem("soulcircle-mood-entries")
-        setEntries([])
-      }
+    if (!currentUser) {
+      navigate("/login")
+      return
     }
-  }, [])
+    
+    loadMoodEntries()
+  }, [currentUser, navigate])
 
-  const saveMoodEntry = () => {
-    if (!selectedMood) return
+  const loadMoodEntries = async () => {
+    if (!currentUser) return
+    
+    try {
+      setLoading(true)
+      setError("")
+      const moodEntries = await getMoodEntries(currentUser.uid)
+      setEntries(moodEntries)
+    } catch (err) {
+      console.error("Error loading mood entries:", err)
+      setError("Failed to load mood entries. Please try again.")
+    } finally {
+      setLoading(false)
+    }
+  }
+
+  const saveMoodEntryToFirestore = async () => {
+    if (!selectedMood || !currentUser) return
 
     const moodData = moodOptions.find((m) => m.name === selectedMood)
     if (!moodData) return
 
-    const newEntry = {
-      id: Date.now().toString(),
-      date: new Date().toLocaleDateString(),
-      mood: selectedMood,
-      intensity: moodData.intensity,
-      note: note.trim(),
-      timestamp: Date.now(),
+    try {
+      setLoading(true)
+      setError("")
+      
+      const entryData = {
+        date: new Date().toLocaleDateString(),
+        mood: selectedMood,
+        intensity: moodData.intensity,
+        note: note.trim(),
+      }
+
+      await saveMoodEntry(currentUser.uid, entryData)
+      
+      // Reload entries to get the latest data
+      await loadMoodEntries()
+
+      // Reset form
+      setSelectedMood("")
+      setNote("")
+      setShowAddForm(false)
+    } catch (err) {
+      console.error("Error saving mood entry:", err)
+      setError("Failed to save mood entry. Please try again.")
+    } finally {
+      setLoading(false)
     }
-
-    const updatedEntries = [newEntry, ...entries]
-    setEntries(updatedEntries)
-    localStorage.setItem("soulcircle-mood-entries", JSON.stringify(updatedEntries))
-
-    // Reset form
-    setSelectedMood("")
-    setNote("")
-    setShowAddForm(false)
   }
 
   const getTodaysEntry = () => {
@@ -88,10 +99,16 @@ const MoodTrackerPage = () => {
   }
 
   const getWeeklyAverage = () => {
-    const weekAgo = Date.now() - 7 * 24 * 60 * 60 * 1000
-    const weekEntries = entries.filter((entry) => entry.timestamp > weekAgo)
+    const weekAgo = new Date()
+    weekAgo.setDate(weekAgo.getDate() - 7)
+    
+    const weekEntries = entries.filter((entry) => {
+      const entryDate = new Date(entry.timestamp?.toDate?.() || entry.timestamp)
+      return entryDate > weekAgo
+    })
+    
     if (weekEntries.length === 0) return 0
-    const sum = weekEntries.reduce((acc, entry) => acc + entry.intensity, 0)
+    const sum = weekEntries.reduce((acc, entry) => acc + (entry.intensity || 0), 0)
     return Math.round((sum / weekEntries.length) * 10) / 10
   }
 
@@ -145,6 +162,21 @@ const MoodTrackerPage = () => {
 
       {/* Main Content */}
       <div className="relative z-10 p-6 max-w-4xl mx-auto">
+        {/* Error Message */}
+        {error && (
+          <div className="mb-6 p-4 bg-red-500/20 border border-red-400/50 text-red-200 rounded-xl flex items-center">
+            <div className="w-5 h-5 mr-2">⚠️</div>
+            {error}
+          </div>
+        )}
+
+        {/* Loading State */}
+        {loading && (
+          <div className="mb-6 text-center">
+            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white mx-auto mb-2"></div>
+            <p className="text-white/70">Loading your mood data...</p>
+          </div>
+        )}
         {/* View Toggle */}
         <div className="flex justify-center mb-6">
           <div className="bg-white/15 backdrop-blur-md border border-white/30 rounded-xl p-1">
@@ -288,11 +320,11 @@ const MoodTrackerPage = () => {
                     Cancel
                   </Button>
                   <Button
-                    onClick={saveMoodEntry}
-                    disabled={!selectedMood}
+                    onClick={saveMoodEntryToFirestore}
+                    disabled={!selectedMood || loading}
                     className="flex-1 py-3 bg-gradient-to-r from-purple-500 to-pink-500 hover:from-purple-600 hover:to-pink-600 disabled:from-gray-500 disabled:to-gray-600 disabled:cursor-not-allowed text-white rounded-xl font-medium transition-all duration-200"
                   >
-                    Save Entry
+                    {loading ? "Saving..." : "Save Entry"}
                   </Button>
                 </div>
               </Card>

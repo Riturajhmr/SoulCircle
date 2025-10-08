@@ -15,6 +15,8 @@ import ProfilePage from "../pages/profile";
 import FeelNotesPage from "../pages/feelnotes";
 import ChatroomPage from "../pages/chatroom";
 import MoodTrackerPage from "../pages/moodtracker";
+import DMsPage from "../pages/dms";
+import SupportCircles from "../pages/supportsCircles";
 
 function App() {
   return (
@@ -30,6 +32,8 @@ function App() {
             <Route path="/feelnotes" element={<FeelNotesPage />} />
             <Route path="/chatroom" element={<ChatroomPage />} />
             <Route path="/moodtracker" element={<MoodTrackerPage />} />
+            <Route path="/dms" element={<DMsPage />} />
+            <Route path="/supportcircles" element={<SupportCircles />} />
         </Routes>
       </Router>
     </AuthProvider>

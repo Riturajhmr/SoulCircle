@@ -85,12 +85,8 @@ export const addUserActivity = async (userId, activityData) => {
 export const getUserActivities = async (userId, limit = 50) => {
   try {
     const activitiesRef = collection(db, 'users', userId, 'activities');
-    const q = query(
-      activitiesRef, 
-      orderBy('timestamp', 'desc')
-    );
     
-    const querySnapshot = await getDocs(q);
+    const querySnapshot = await getDocs(activitiesRef);
     const activities = [];
     
     querySnapshot.forEach((doc) => {
@@ -98,6 +94,13 @@ export const getUserActivities = async (userId, limit = 50) => {
         id: doc.id,
         ...doc.data()
       });
+    });
+    
+    // Sort in JavaScript instead of Firestore query
+    activities.sort((a, b) => {
+      const aTime = a.timestamp?.seconds || 0;
+      const bTime = b.timestamp?.seconds || 0;
+      return bTime - aTime; // descending order
     });
     
     return activities.slice(0, limit);
@@ -111,9 +114,8 @@ export const getUserActivities = async (userId, limit = 50) => {
 export const listenToUserActivities = (userId, callback) => {
   try {
     const activitiesRef = collection(db, 'users', userId, 'activities');
-    const q = query(activitiesRef, orderBy('timestamp', 'desc'));
     
-    return onSnapshot(q, (querySnapshot) => {
+    return onSnapshot(activitiesRef, (querySnapshot) => {
       const activities = [];
       querySnapshot.forEach((doc) => {
         activities.push({
@@ -121,7 +123,19 @@ export const listenToUserActivities = (userId, callback) => {
           ...doc.data()
         });
       });
+      
+      // Sort in JavaScript instead of Firestore query
+      activities.sort((a, b) => {
+        const aTime = a.timestamp?.seconds || 0;
+        const bTime = b.timestamp?.seconds || 0;
+        return bTime - aTime; // descending order
+      });
+      
       callback(activities);
+    }, (error) => {
+      console.error('❌ Error in activities listener:', error);
+      // Don't throw, just log - this prevents app crashes
+      callback([]); // Return empty array on error
     });
   } catch (error) {
     console.error('❌ Error setting up activities listener:', error);
@@ -193,6 +207,77 @@ export const getQuestionResponses = async (userId) => {
     }
   } catch (error) {
     console.error('❌ Error getting question responses:', error);
+    throw error;
+  }
+};
+
+// Mood Tracking Management
+export const saveMoodEntry = async (userId, moodData) => {
+  try {
+    const moodRef = collection(db, 'users', userId, 'moodEntries');
+    const entry = {
+      ...moodData,
+      timestamp: serverTimestamp(),
+      createdAt: serverTimestamp()
+    };
+    
+    const docRef = await addDoc(moodRef, entry);
+    return docRef.id;
+  } catch (error) {
+    console.error('❌ Error saving mood entry:', error);
+    throw error;
+  }
+};
+
+export const getMoodEntries = async (userId, limit = 100) => {
+  try {
+    const moodRef = collection(db, 'users', userId, 'moodEntries');
+    const q = query(
+      moodRef, 
+      orderBy('timestamp', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    const entries = [];
+    
+    querySnapshot.forEach((doc) => {
+      entries.push({
+        id: doc.id,
+        ...doc.data()
+      });
+    });
+    
+    return entries.slice(0, limit);
+  } catch (error) {
+    console.error('❌ Error getting mood entries:', error);
+    throw error;
+  }
+};
+
+export const getTodaysMoodEntry = async (userId) => {
+  try {
+    const today = new Date();
+    today.setHours(0, 0, 0, 0);
+    
+    const moodRef = collection(db, 'users', userId, 'moodEntries');
+    const q = query(
+      moodRef,
+      where('date', '==', today.toLocaleDateString()),
+      orderBy('timestamp', 'desc')
+    );
+    
+    const querySnapshot = await getDocs(q);
+    if (!querySnapshot.empty) {
+      const doc = querySnapshot.docs[0];
+      return {
+        id: doc.id,
+        ...doc.data()
+      };
+    }
+    
+    return null;
+  } catch (error) {
+    console.error('❌ Error getting today\'s mood entry:', error);
     throw error;
   }
 };

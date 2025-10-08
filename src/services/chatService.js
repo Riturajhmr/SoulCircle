@@ -27,7 +27,13 @@ export const createRoom = async (roomData) => {
       createdAt: serverTimestamp(),
       lastMessage: null,
       memberCount: 1,
-      isActive: true
+      isActive: true,
+      isPrivate: roomData.isPrivate || false,
+      members: {
+        [roomData.createdBy]: 'owner' // Creator is owner
+      },
+      bannedUsers: [],
+      inviteCode: roomData.isPrivate ? generateInviteCode() : null
     };
     
     const docRef = await addDoc(roomsRef, room);
@@ -36,6 +42,11 @@ export const createRoom = async (roomData) => {
     console.error('❌ Error creating room:', error);
     throw error;
   }
+};
+
+// Generate random invite code
+const generateInviteCode = () => {
+  return Math.random().toString(36).substring(2, 10).toUpperCase();
 };
 
 export const getAllRooms = async (limitCount = 50) => {

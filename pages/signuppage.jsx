@@ -78,7 +78,7 @@ const SignupPage = () => {
 
     try {
       await signup(formData.email, formData.password, formData.name)
-      navigate("/login")
+      // Don't navigate here - let the useEffect handle the redirect based on user state
     } catch (error) {
       setError(error.message)
     } finally {

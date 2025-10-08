@@ -167,8 +167,7 @@ const ProfilePage = () => {
         metadata: {
           mood: mood,
           emoji: selectedMood?.emoji || '❓',
-          date: new Date().toISOString(),
-          timestamp: new Date().toISOString()
+          date: new Date().toISOString()
         }
       })
       

@@ -73,10 +73,14 @@ export const getAllFeelNotes = async (limitCount = 100) => {
     const allFeelNotes = [];
     snapshot.forEach((docSnap) => {
       const data = docSnap.data();
+      // Extract userId from the document path: users/{userId}/feelNotes/{noteId}
+      const pathParts = docSnap.ref.path.split('/');
+      const userId = pathParts[1]; // users/{userId}/feelNotes/{noteId}
+      
       allFeelNotes.push({
         id: docSnap.id,
         ...data,
-        authorId: undefined
+        authorId: userId // Keep authorId for like functionality
       });
     });
     return allFeelNotes;
